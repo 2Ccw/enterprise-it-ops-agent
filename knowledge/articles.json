@@ -1,0 +1,11 @@
+[
+  {"citation_id":"IT-KB-ACCT-001","category":"account","title":"企业账号锁定与密码重置","content":"账号连续登录失败被锁定时，先确认用户名和公司登录域是否正确。等待15分钟后再次尝试；仍失败则通过企业身份验证门户发起密码重置。服务台不得索取或记录用户密码、短信验证码和MFA动态码。","keywords":["账号锁定","密码重置","登录失败","MFA"],"version":"3.2","effective_date":"2026-08-01"},
+  {"citation_id":"IT-KB-NET-002","category":"network","title":"Windows办公网络无法连接","content":"先确认飞行模式已关闭并检查网线或Wi-Fi连接状态，再执行系统网络诊断。公司内网不可用但公共网站正常时，记录IP配置和发生时间后提交网络工单。禁止指导用户关闭终端防护或修改公司安全策略。","keywords":["无法上网","Wi-Fi","网络","内网","DNS"],"version":"2.6","effective_date":"2026-09-10"},
+  {"citation_id":"IT-KB-VPN-003","category":"vpn","title":"企业VPN连接失败","content":"确认设备时间自动同步、网络可访问外网且VPN客户端为企业软件中心发布版本。错误代码AUTH-401通常需要重新完成MFA；错误代码TUNNEL-503应记录时间和网络类型后提交网络工单。不得绕过证书校验。","keywords":["VPN","AUTH-401","TUNNEL-503","远程办公"],"version":"4.1","effective_date":"2026-10-01"},
+  {"citation_id":"IT-KB-MAIL-004","category":"email","title":"Outlook收发邮件异常","content":"先检查网页版邮箱是否正常、邮箱配额是否已满以及客户端是否处于脱机状态。网页版正常而客户端异常时，可重新启动客户端并记录错误代码；禁止删除用户本地数据文件作为首选步骤。","keywords":["Outlook","邮件","收不到邮件","脱机","邮箱配额"],"version":"2.3","effective_date":"2026-07-15"},
+  {"citation_id":"IT-KB-SW-005","category":"software","title":"企业软件安装与权限申请","content":"软件必须通过企业软件中心或审批流程安装。需要管理员权限、商业许可证或处理敏感数据的软件，应创建审批工单并说明业务用途、设备编号和所需期限。不得提供绕过管理员权限的方法。","keywords":["安装软件","管理员权限","许可证","软件中心"],"version":"3.0","effective_date":"2026-06-20"},
+  {"citation_id":"IT-KB-SEC-006","category":"security","title":"钓鱼邮件与账号泄露应急处置","content":"怀疑钓鱼邮件、恶意附件、账号泄露或异常MFA请求时，不要继续点击链接或回复邮件，立即断开可疑操作并联系安全响应团队。若已输入凭据，应从可信设备修改密码并报告事件。不要自行删除证据。","keywords":["钓鱼","恶意附件","账号泄露","异常MFA","安全事件"],"version":"5.0","effective_date":"2026-10-15"},
+  {"citation_id":"IT-KB-DEVICE-007","category":"device","title":"办公设备丢失或被盗","content":"设备丢失或被盗时立即向安全团队和直属负责人报告，提供资产编号、最后确认位置和时间。不得在公共渠道发布设备序列号、个人住址或账号信息。由授权团队执行远程锁定或擦除。","keywords":["电脑丢失","手机被盗","设备丢失","远程锁定"],"version":"3.8","effective_date":"2026-09-01"},
+  {"citation_id":"IT-KB-PRINT-008","category":"printer","title":"网络打印机常见故障","content":"确认打印机在线、无缺纸卡纸提示，并检查所选打印机名称是否正确。清除个人待打印任务后重试；多人同时无法打印时记录打印机名称、楼层和错误提示并创建工单。","keywords":["打印机","无法打印","卡纸","打印队列"],"version":"1.9","effective_date":"2026-05-12"}
+]
+

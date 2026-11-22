@@ -1,0 +1,27 @@
+services:
+  it-ops-api:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    ports:
+      - "127.0.0.1:8030:8030"
+    environment:
+      IT_OPS_API_KEY: ${IT_OPS_API_KEY}
+      RATE_LIMIT_PER_MINUTE: ${RATE_LIMIT_PER_MINUTE:-60}
+    volumes:
+      - it_ops_data:/app/data
+    networks:
+      - default
+      - dify
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8030/health')"]
+      interval: 20s
+      timeout: 5s
+      retries: 3
+volumes:
+  it_ops_data:
+networks:
+  dify:
+    external: true
+    name: docker_default

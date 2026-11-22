@@ -1,0 +1,6 @@
+[
+  {"asset_tag":"LAP-1001","device_type":"laptop","model":"ThinkPad T14","status":"assigned","support_group":"Endpoint Support","warranty_until":"2027-06-30"},
+  {"asset_tag":"LAP-1002","device_type":"laptop","model":"Dell Latitude 7440","status":"maintenance","support_group":"Endpoint Support","warranty_until":"2027-09-15"},
+  {"asset_tag":"PRN-2001","device_type":"printer","model":"HP LaserJet Enterprise","status":"active","support_group":"Workplace IT","warranty_until":"2026-12-31"},
+  {"asset_tag":"NET-3001","device_type":"network_appliance","model":"Branch Router Demo","status":"active","support_group":"Network Operations","warranty_until":"2028-03-01"}
+]

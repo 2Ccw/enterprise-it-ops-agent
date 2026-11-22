@@ -1,0 +1,594 @@
+app:
+  description: 面向企业内部员工的IT故障排查、资产查询和人工审核工单Agent。
+  icon: 🖥️
+  icon_background: '#E6F4EA'
+  icon_type: emoji
+  mode: advanced-chat
+  name: 企业IT运维工单Agent
+  use_icon_as_answer_icon: true
+dependencies: []
+kind: app
+version: 0.3.1
+workflow:
+  conversation_variables: []
+  environment_variables:
+  - description: IT运维工具服务访问密钥
+    id: 8e46cf91-d8da-4ca1-8fbc-181e1c31d201
+    name: IT_OPS_API_KEY
+    selector: [env, IT_OPS_API_KEY]
+    value: local-it-ops-key-change-me
+    value_type: secret
+  features:
+    file_upload:
+      enabled: false
+    opening_statement: |-
+      你好，我可以协助处理企业账号、网络、VPN、邮件、软件、办公设备和打印机问题。
+
+      请描述故障现象、错误代码及设备资产编号（如LAP-1001）。不要发送密码、短信验证码、MFA动态码或其他敏感凭据。
+    retriever_resource:
+      enabled: false
+    sensitive_word_avoidance:
+      enabled: false
+    speech_to_text:
+      enabled: false
+    suggested_questions:
+    - VPN显示AUTH-401，应该怎么处理？
+    - 查询资产LAP-1001的支持组和保修状态
+    - Outlook无法收取邮件，如何排查？
+    suggested_questions_after_answer:
+      enabled: false
+    text_to_speech:
+      enabled: false
+      language: ''
+      voice: ''
+  graph:
+    edges:
+    - data: {isInIteration: false, isInLoop: false, sourceType: start, targetType: code}
+      id: start-triage
+      source: start
+      sourceHandle: source
+      target: triage
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data: {isInIteration: false, isInLoop: false, sourceType: code, targetType: if-else}
+      id: triage-route
+      source: triage
+      sourceHandle: source
+      target: route
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data: {isInIteration: false, isInLoop: false, sourceType: if-else, targetType: answer}
+      id: route-security
+      source: route
+      sourceHandle: security
+      target: security_answer
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data: {isInIteration: false, isInLoop: false, sourceType: if-else, targetType: http-request}
+      id: route-asset
+      source: route
+      sourceHandle: asset
+      target: asset_lookup
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data: {isInIteration: false, isInLoop: false, sourceType: http-request, targetType: answer}
+      id: asset-answer-edge
+      source: asset_lookup
+      sourceHandle: source
+      target: asset_answer
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data: {isInIteration: false, isInLoop: false, sourceType: if-else, targetType: http-request}
+      id: route-ticket
+      source: route
+      sourceHandle: ticket
+      target: create_ticket
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data: {isInIteration: false, isInLoop: false, sourceType: http-request, targetType: answer}
+      id: ticket-answer-edge
+      source: create_ticket
+      sourceHandle: source
+      target: ticket_answer
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data: {isInIteration: false, isInLoop: false, sourceType: if-else, targetType: http-request}
+      id: route-search
+      source: route
+      sourceHandle: 'false'
+      target: search
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data: {isInIteration: false, isInLoop: false, sourceType: http-request, targetType: code}
+      id: search-validate-edge
+      source: search
+      sourceHandle: source
+      target: validate_search
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data: {isInIteration: false, isInLoop: false, sourceType: code, targetType: if-else}
+      id: validate-status-edge
+      source: validate_search
+      sourceHandle: source
+      target: search_status
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data: {isInIteration: false, isInLoop: false, sourceType: if-else, targetType: llm}
+      id: status-advisor
+      source: search_status
+      sourceHandle: success
+      target: advisor
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data: {isInIteration: false, isInLoop: false, sourceType: if-else, targetType: answer}
+      id: status-fallback
+      source: search_status
+      sourceHandle: 'false'
+      target: fallback_answer
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data: {isInIteration: false, isInLoop: false, sourceType: llm, targetType: answer}
+      id: advisor-final
+      source: advisor
+      sourceHandle: source
+      target: final_answer
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    nodes:
+    - data:
+        desc: 接收员工IT支持请求
+        selected: false
+        title: 用户请求
+        type: start
+        variables: []
+      height: 90
+      id: start
+      position: {x: 40, y: 360}
+      positionAbsolute: {x: 40, y: 360}
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+      zIndex: 0
+    - data:
+        code: |-
+          import hashlib
+          import json
+          import re
+
+          def main(query: str) -> dict:
+              text = (query or "").strip()
+              lower = text.lower()
+              asset_match = re.search(r"(?<![A-Z0-9])(?:LAP|PRN|NET)-\d{4}(?![A-Z0-9])", text.upper())
+              asset_tag = asset_match.group(0) if asset_match else ""
+              security_terms = ["钓鱼", "恶意附件", "账号泄露", "异常mfa", "中毒", "勒索", "电脑丢失", "设备被盗"]
+              security_hits = [term for term in security_terms if term in lower]
+              category_rules = [
+                  ("security", ["钓鱼", "恶意", "泄露", "中毒", "被盗", "丢失"]),
+                  ("vpn", ["vpn", "auth-401", "tunnel-503"]),
+                  ("account", ["账号", "密码", "登录", "mfa"]),
+                  ("email", ["outlook", "邮件", "邮箱"]),
+                  ("network", ["网络", "无法上网", "wi-fi", "wifi", "内网", "dns"]),
+                  ("software", ["安装软件", "管理员权限", "许可证"]),
+                  ("printer", ["打印机", "无法打印", "卡纸"]),
+                  ("device", ["电脑", "设备", "资产"]),
+              ]
+              category = "general"
+              for candidate, terms in category_rules:
+                  if any(term in lower for term in terms):
+                      category = candidate
+                      break
+              wants_asset = bool(asset_tag and any(term in text for term in ["查询资产", "设备信息", "保修", "支持组"]))
+              wants_ticket = text.startswith("确认创建工单")
+              priority = "P1" if security_hits else ("P2" if any(term in text for term in ["大面积", "全部员工", "业务中断"]) else ("P4" if category == "software" else "P3"))
+              if security_hits:
+                  route = "security"
+              elif wants_asset:
+                  route = "asset"
+              elif wants_ticket:
+                  route = "ticket"
+              else:
+                  route = "search"
+              digest = hashlib.sha256(text.encode("utf-8")).hexdigest()[:24]
+              return {
+                  "route": route,
+                  "category": category,
+                  "priority": priority,
+                  "asset_tag": asset_tag,
+                  "issue": text[:1800],
+                  "issue_json": json.dumps(text[:1800], ensure_ascii=False),
+                  "security_hits": "、".join(security_hits) if security_hits else "无",
+                  "idempotency_key": "dify-" + digest,
+              }
+        code_language: python3
+        desc: 使用确定性规则识别安全事件、类别、优先级、资产编号和工单确认
+        outputs:
+          asset_tag: {children: null, type: string}
+          category: {children: null, type: string}
+          idempotency_key: {children: null, type: string}
+          issue: {children: null, type: string}
+          issue_json: {children: null, type: string}
+          priority: {children: null, type: string}
+          route: {children: null, type: string}
+          security_hits: {children: null, type: string}
+        selected: false
+        title: 请求分诊与风险识别
+        type: code
+        variables:
+        - value_selector: [sys, query]
+          value_type: string
+          variable: query
+      height: 90
+      id: triage
+      position: {x: 340, y: 360}
+      positionAbsolute: {x: 340, y: 360}
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 280
+      zIndex: 0
+    - data:
+        cases:
+        - case_id: security
+          conditions:
+          - comparison_operator: is
+            id: route-security-condition
+            value: security
+            varType: string
+            variable_selector: [triage, route]
+          id: security
+          logical_operator: and
+        - case_id: asset
+          conditions:
+          - comparison_operator: is
+            id: route-asset-condition
+            value: asset
+            varType: string
+            variable_selector: [triage, route]
+          id: asset
+          logical_operator: and
+        - case_id: ticket
+          conditions:
+          - comparison_operator: is
+            id: route-ticket-condition
+            value: ticket
+            varType: string
+            variable_selector: [triage, route]
+          id: ticket
+          logical_operator: and
+        desc: 安全事件优先，资产查询与工单写入单独分流
+        selected: false
+        title: 执行路由
+        type: if-else
+      height: 198
+      id: route
+      position: {x: 690, y: 360}
+      positionAbsolute: {x: 690, y: 360}
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 260
+      zIndex: 0
+    - data:
+        answer: |-
+          事件级别：安全事件，立即人工接管
+
+          检测到：{{#triage.security_hits#}}
+
+          请立即停止点击链接、打开附件或继续输入凭据，并联系企业安全响应团队。如果已经输入账号信息，请从可信设备修改密码。不要发送密码、验证码或MFA动态码，也不要自行删除邮件、日志或其他证据。
+        selected: false
+        title: 安全事件升级
+        type: answer
+        variables: []
+      height: 90
+      id: security_answer
+      position: {x: 1040, y: 20}
+      positionAbsolute: {x: 1040, y: 20}
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 320
+      zIndex: 0
+    - data:
+        authorization: {type: no-auth}
+        body: {type: none, data: ''}
+        desc: 只返回演示资产的非敏感支持信息
+        headers: "X-IT-Ops-Key:{{#env.IT_OPS_API_KEY#}}"
+        method: get
+        params: ''
+        retry_config:
+          enabled: true
+          max_retries: 2
+          retry_interval: 500
+          exponential_backoff: {enabled: true, multiplier: 2, max_interval: 5000}
+        selected: false
+        timeout: {connect: 5, read: 15, write: 10}
+        title: 查询资产信息
+        type: http-request
+        url: http://it-ops-api:8030/api/v1/assets/{{#triage.asset_tag#}}
+        variables: []
+      height: 90
+      id: asset_lookup
+      position: {x: 1040, y: 210}
+      positionAbsolute: {x: 1040, y: 210}
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 320
+      zIndex: 0
+    - data:
+        answer: |-
+          资产查询结果：
+          {{#asset_lookup.body#}}
+
+          仅显示演示资产的设备型号、状态、支持组和保修日期，不包含真实员工隐私数据。
+        selected: false
+        title: 资产查询结果
+        type: answer
+        variables: []
+      height: 90
+      id: asset_answer
+      position: {x: 1420, y: 210}
+      positionAbsolute: {x: 1420, y: 210}
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 320
+      zIndex: 0
+    - data:
+        authorization: {type: no-auth}
+        body:
+          type: raw-text
+          data: '{"summary":{{#triage.issue_json#}},"category":"{{#triage.category#}}","priority":"{{#triage.priority#}}","asset_tag":"{{#triage.asset_tag#}}","requester_alias":"dify-demo-user","idempotency_key":"{{#triage.idempotency_key#}}"}'
+        desc: 用户明确确认后只创建pending_review草稿
+        headers: "Content-Type:application/json\nX-IT-Ops-Key:{{#env.IT_OPS_API_KEY#}}"
+        method: post
+        params: ''
+        retry_config:
+          enabled: false
+          max_retries: 1
+          retry_interval: 1000
+          exponential_backoff: {enabled: false, multiplier: 2, max_interval: 10000}
+        selected: false
+        timeout: {connect: 5, read: 15, write: 15}
+        title: 创建待审核工单草稿
+        type: http-request
+        url: http://it-ops-api:8030/api/v1/ticket-drafts
+        variables: []
+      height: 90
+      id: create_ticket
+      position: {x: 1040, y: 400}
+      positionAbsolute: {x: 1040, y: 400}
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 320
+      zIndex: 0
+    - data:
+        answer: |-
+          工单服务返回：
+          {{#create_ticket.body#}}
+
+          该记录只是待审核草稿，尚未提交到真实ITSM系统。人工审核通过后才能进行后续处理。
+        selected: false
+        title: 工单草稿结果
+        type: answer
+        variables: []
+      height: 90
+      id: ticket_answer
+      position: {x: 1420, y: 400}
+      positionAbsolute: {x: 1420, y: 400}
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 320
+      zIndex: 0
+    - data:
+        authorization: {type: no-auth}
+        body:
+          type: raw-text
+          data: '{"query":{{#triage.issue_json#}},"category":"{{#triage.category#}}","top_k":4}'
+        desc: 按故障类别检索受控IT知识并返回引用ID
+        headers: "Content-Type:application/json\nX-IT-Ops-Key:{{#env.IT_OPS_API_KEY#}}"
+        method: post
+        params: ''
+        retry_config:
+          enabled: true
+          max_retries: 2
+          retry_interval: 500
+          exponential_backoff: {enabled: true, multiplier: 2, max_interval: 5000}
+        selected: false
+        timeout: {connect: 5, read: 20, write: 10}
+        title: 检索IT知识
+        type: http-request
+        url: http://it-ops-api:8030/api/v1/search
+        variables: []
+      height: 90
+      id: search
+      position: {x: 1040, y: 620}
+      positionAbsolute: {x: 1040, y: 620}
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 320
+      zIndex: 0
+    - data:
+        code: |-
+          import json
+
+          def main(body: str) -> dict:
+              try:
+                  payload = json.loads(body or "")
+              except (TypeError, ValueError):
+                  return {"ok": "false"}
+              valid = isinstance(payload, dict) and isinstance(payload.get("evidence_found"), bool) and isinstance(payload.get("evidence"), list)
+              return {"ok": "true" if valid else "false"}
+        code_language: python3
+        desc: 解析检索JSON，拒绝401、非JSON和缺少证据字段的响应
+        outputs:
+          ok: {children: null, type: string}
+        selected: false
+        title: 检索响应校验
+        type: code
+        variables:
+        - value_selector: [search, body]
+          value_type: string
+          variable: body
+      height: 90
+      id: validate_search
+      position: {x: 1400, y: 620}
+      positionAbsolute: {x: 1400, y: 620}
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 280
+      zIndex: 0
+    - data:
+        cases:
+        - case_id: success
+          conditions:
+          - comparison_operator: is
+            id: search-response-valid
+            value: 'true'
+            varType: string
+            variable_selector: [validate_search, ok]
+          id: success
+          logical_operator: and
+        desc: 工具失败时禁止模型自行补全答案
+        selected: false
+        title: 检索状态校验
+        type: if-else
+      height: 126
+      id: search_status
+      position: {x: 1740, y: 620}
+      positionAbsolute: {x: 1740, y: 620}
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 260
+      zIndex: 0
+    - data:
+        answer: |-
+          当前无法访问受控IT知识服务，因此不能可靠提供操作步骤。
+
+          请稍后重试或联系人工服务台，并提供错误代码、发生时间、影响范围和设备资产编号。不要发送密码、验证码或MFA动态码。
+        selected: false
+        title: 工具失败降级
+        type: answer
+        variables: []
+      height: 90
+      id: fallback_answer
+      position: {x: 1770, y: 840}
+      positionAbsolute: {x: 1770, y: 840}
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 320
+      zIndex: 0
+    - data:
+        context: {enabled: false, variable_selector: []}
+        desc: 只依据受控检索证据生成排查建议
+        memory:
+          query_prompt_template: |-
+            当前问题：{{#sys.query#}}
+            类别：{{#triage.category#}}
+            优先级：{{#triage.priority#}}
+            检索证据：{{#search.body#}}
+          role_prefix: {user: '', assistant: ''}
+          window: {enabled: true, size: 3}
+        model:
+          completion_params: {temperature: 0.1}
+          mode: chat
+          name: gpt-5.6-sol
+          provider: langgenius/openai_api_compatible/openai_api_compatible
+        model_selector: null
+        prompt_template:
+        - id: f38c02d2-7474-45ed-8fd7-4ef13bc3d101
+          role: system
+          text: |-
+            你是企业内部IT服务台Agent。你只能依据检索节点返回的evidence回答，不能使用模型自身知识编造命令、账号状态、资产信息或处理结果。
+
+            规则：
+            1. 每项关键建议必须标注真实存在的[citation_id]。
+            2. evidence_found为false或资料不足时明确拒绝猜测，并建议人工服务台接管。
+            3. 不索取、复述或保存密码、短信验证码、MFA动态码、私钥和访问令牌。
+            4. 不提供绕过管理员权限、证书、安全软件、终端防护或公司策略的方法。
+            5. 不声称已经修改账号、修复设备或提交生产工单，除非工具返回明确证据。
+            6. 需要创建工单时，先给出摘要、类别和优先级，再要求用户使用“确认创建工单，问题描述”的格式确认。
+            7. 只输出纯文本，不使用Markdown星号、井号或代码围栏。
+
+            固定输出：
+            事件类别：
+            建议优先级：
+            资料依据：
+            排查步骤：最多5步
+            升级条件：
+            需要补充：最多3项
+        - id: 97ed5771-36ae-4210-823c-1c0b0cb7e102
+          role: user
+          text: |-
+            用户请求：{{#sys.query#}}
+            分类结果：{{#triage.category#}}
+            建议优先级：{{#triage.priority#}}
+            受控检索证据：{{#search.body#}}
+        selected: false
+        structured_output_enabled: false
+        title: 生成带引用的处理建议
+        type: llm
+        variables: []
+        vision: {enabled: false}
+      height: 131
+      id: advisor
+      position: {x: 1770, y: 590}
+      positionAbsolute: {x: 1770, y: 590}
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 330
+      zIndex: 0
+    - data:
+        answer: |-
+          {{#advisor.text#}}
+
+          本回答仅基于当前受控IT资料，用于辅助排查，不能替代企业安全制度和授权运维人员判断。
+        selected: false
+        title: 最终回复
+        type: answer
+        variables: []
+      height: 90
+      id: final_answer
+      position: {x: 2160, y: 590}
+      positionAbsolute: {x: 2160, y: 590}
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 330
+      zIndex: 0
+    viewport: {x: 0, y: 0, zoom: 0.42}
